@@ -54,14 +54,7 @@ sso_role_name = DevOps
 
 That's it. You should be good to go.
 
-### Options
-
-- `-h, --help` - Show help and a list of command line options.
-- `-v, --verbose` Verbose mode. Tells you what the script is doing and dumps information about when your SSO credentials and temporary credentials expire.
-- `--login` Invokes the AWS CLI to perform and SSO login and refresh SSO credentials.
-- `-d, --use-default` Copies the chosen profile and credentials to the default profile. This removes the need to pass a profile name or export the `AWS_PROFILE` environment variable.
-
-## Example usage
+## Useage
 
 You can run `awssso` passing it the name of the profile you want credentials for.
 
@@ -69,18 +62,18 @@ You can run `awssso` passing it the name of the profile you want credentials for
   $ awssso dev-env
 ```
 
-If you don't pass a profile name it will prompt you allow you to select from a list:
+If you don't pass a profile name it will allow you to select from a list:
 
 ```
    $ awssso
    
-   [?] Please select an AWS config profile: default
- > default
-   dev-env
+   [?] Please select an AWS config profile: dev-env
+   default
+ > dev-env
    prod-env
 ```
 
-Once the profile is selected, the script will check if you're current SSO credentials are valid and warn you if they will expire soon. It will then use these credentials to get a the short term-credentials and copy them to your `.aws/credentials` file.
+Once the profile is selected, the script will check if you're current SSO credentials are valid and warn you if they will expire soon. It will then use these credentials to get the short term-credentials and copy them to your `.aws/credentials` file.
 
 You can then use these credentials with the tool of your choice either by passing the profile name, or setting the profile in your environment:
 
@@ -88,13 +81,25 @@ You can then use these credentials with the tool of your choice either by passin
   export AWS_PROFILE=dev-env
 ```
 
-Here is a more simple example that I use in my own day-to-day routine.
+If you want to avoid having to set a profile, use the `-d` option detailed below.
 
-```bash
+### Options
+
+- `-h, --help` - Show help and a list of command line options.
+- `-v, --verbose` Verbose mode. Tells you what the script is doing and dumps information about when your SSO credentials and temporary credentials expire.
+- `--login` Invokes the AWS CLI to perform a SSO login and refresh SSO credentials.
+- `-d, --use-default` Copies the chosen profile and credentials to the default profile. This removes the need to pass a profile name or export the `AWS_PROFILE` environment variable.
+
+## Example
+
+Here is a simple example that I use in my own day-to-day routine.
+
+```
   $ awsso --login -v -d dev-env
   
   Attempting to automatically open the SSO authorization page in your default browser.
-  If the browser does not open or you wish to use a different device to authorize this request, open the following URL:
+  If the browser does not open or you wish to use a different device to authorize this request,
+  open the following URL:
 
   https://device.sso.eu-west-1.amazonaws.com/
 
