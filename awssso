@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -89,30 +90,31 @@ def _get_aws_profile(profile_name):
 
 def _get_sso_cached_login(profile):
     _print_msg('\nChecking for SSO credentials...')
-    file_paths = _list_directory(AWS_SSO_CACHE_PATH)
 
-    for file_path in file_paths:
-        data = _load_json(file_path)
+    cache = hashlib.sha1(profile["sso_start_url"].encode("utf-8")).hexdigest()
+    sso_cache_file = f'{AWS_SSO_CACHE_PATH}/{cache}.json'
 
-        if data.get('startUrl') != profile['sso_start_url']:
-            continue
+    if not Path(sso_cache_file).is_file():
+        _print_error(
+            'Current cached SSO login is invalid/missing. Login with the AWS CLI tool or use --login')
 
-        if data.get('region') != profile['sso_region']:
-            continue
-
+    else:
+        data = _load_json(sso_cache_file)
         expires_at = _parse_time(data['expiresAt'])
 
+        if data.get('region') != profile['sso_region']:
+            _print_error(
+                'SSO authentication region in cache does not match region defined in profile')
+
         if datetime.utcnow() > expires_at:
-            _print_error('SSO credentials have expired. Please re-validate with the AWS CLI tool or --login option.')
-            sys.exit(1)
+            _print_error(
+                'SSO credentials have expired. Please re-validate with the AWS CLI tool or --login option.')
 
         if (datetime.utcnow() + timedelta(minutes=15)) >= expires_at:
             _print_warn('Your current SSO credentials will expire in less than 15 minutes!')
 
         _print_success(f'Found credentials. Valid until {expires_at} UTC')
         return data
-
-    raise Exception('Current cached SSO login is invalid/missing. Login with the AWS CLI tool or use --login')
 
 
 def _get_sso_role_credentials(profile, login):
@@ -201,6 +203,7 @@ def _print_colour(colour, message, always=False):
 
 def _print_error(message):
     _print_colour(Colour.FAIL, message, always=True)
+    sys.exit(1)
 
 
 def _print_warn(message):
@@ -232,15 +235,6 @@ def _read_config(path):
 def _write_config(path, config):
     with open(path, "w") as destination:
         config.write(destination)
-
-
-def _list_directory(path):
-    file_paths = []
-    if os.path.exists(path):
-        file_paths = Path(path).iterdir()
-    file_paths = sorted(file_paths, key=os.path.getmtime)
-    file_paths.reverse()  # sort by last updated
-    return [str(f) for f in file_paths]
 
 
 def _load_json(path):
