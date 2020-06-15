@@ -50,8 +50,6 @@ sso_role_name = DevOps
 
 4. Copy the `awssso` script to somewhere you can run it. Usually somewhere on your `%PATH%` or make a symlink to it from somewhere like `/usr/local/bin`. Make sure to make it executeable, i.e. `chmod ug+w awssso`.
 
-5. In the `awssso` script, edit the `AWS_CLI_V2` variable to point to where the AWS CLI program is installed on your system.
-
 That's it. You should be good to go.
 
 ## Useage
