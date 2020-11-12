@@ -14,11 +14,13 @@ import boto3
 import inquirer
 
 VERBOSE_MODE = False
+DOCKER_CMD = ['docker', 'run', '--rm', '-t', '-v', f'{Path.home()}/.aws:/root/.aws', 'amazon/aws-cli']
 
 AWS_CONFIG_PATH = f'{Path.home()}/.aws/config'
 AWS_CREDENTIAL_PATH = f'{Path.home()}/.aws/credentials'
 AWS_SSO_CACHE_PATH = f'{Path.home()}/.aws/sso/cache'
 AWS_DEFAULT_REGION = 'eu-west-1'
+
 
 class Colour:
     HEADER = '\033[95m'
@@ -51,18 +53,26 @@ def main():
                         action='store_true',
                         help='Perform an SSO login by default, not just when SSO credentials have expired')
 
+    parser.add_argument('--docker',
+                        action='store_true',
+                        help='Use the docker version of the AWS CLI')
+
     args = parser.parse_args()
 
     # validate aws v2
     try:
-        aws_version = subprocess.run(['aws', '--version'], stdout=subprocess.PIPE).stdout.decode('utf-8')
+        if args.docker:
+            aws_version = subprocess.run(DOCKER_CMD + ['--version'], capture_output=True).stdout.decode('utf-8')
+        else:
+            aws_version = subprocess.run(['aws', '--version'], capture_output=True).stdout.decode('utf-8')
+
         if 'aws-cli/2' not in aws_version:
             _print_error('\n AWS CLI Version 2 not found. Please install. Exiting.')
             exit(1)
     except Exception as e:
-        _print_error(f'\nAn error occured trying to find AWS CLI version. Do you have AWS CLI Version 2 installed?\n{e}')
+        _print_error(
+            f'\nAn error occured trying to find AWS CLI version. Do you have AWS CLI Version 2 installed?\n{e}')
         exit(1)
-
 
     global VERBOSE_MODE
     VERBOSE_MODE = args.verbose
@@ -70,7 +80,7 @@ def main():
     profile = _add_prefix(args.profile if args.profile else _select_profile())
 
     if args.login:
-        _spawn_cli_for_auth(profile)
+        _spawn_cli_for_auth(profile, args.docker)
 
     _set_profile_credentials(profile, args.use_default if profile != 'default' else False)
 
@@ -193,11 +203,17 @@ def _select_profile():
     return answer['name'] if answer else sys.exit(1)
 
 
-def _spawn_cli_for_auth(profile):
-    subprocess.run(['aws', 'sso', 'login', '--profile', str(profile).lstrip('profile ')],
-                   stderr=sys.stderr,
-                   stdout=sys.stdout,
-                   check=True)
+def _spawn_cli_for_auth(profile, docker=False):
+    if docker:
+        subprocess.run(DOCKER_CMD + ['sso', 'login', '--profile', str(profile).lstrip('profile ')],
+                       stderr=sys.stderr,
+                       stdout=sys.stdout,
+                       check=True)
+    else:
+        subprocess.run(['aws', 'sso', 'login', '--profile', str(profile).lstrip('profile ')],
+                       stderr=sys.stderr,
+                       stdout=sys.stdout,
+                       check=True)
 
 
 def _print_colour(colour, message, always=False):
