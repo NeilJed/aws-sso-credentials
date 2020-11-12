@@ -61,10 +61,8 @@ def main():
 
     # validate aws v2
     try:
-        if args.docker:
-            aws_version = subprocess.run(DOCKER_CMD + ['--version'], capture_output=True).stdout.decode('utf-8')
-        else:
-            aws_version = subprocess.run(['aws', '--version'], capture_output=True).stdout.decode('utf-8')
+        cmd = DOCKER_CMD if args.docker else ['aws']
+        aws_version = subprocess.run(cmd + ['--version'], capture_output=True).stdout.decode('utf-8')
 
         if 'aws-cli/2' not in aws_version:
             _print_error('\n AWS CLI Version 2 not found. Please install. Exiting.')
@@ -204,16 +202,11 @@ def _select_profile():
 
 
 def _spawn_cli_for_auth(profile, docker=False):
-    if docker:
-        subprocess.run(DOCKER_CMD + ['sso', 'login', '--profile', str(profile).lstrip('profile ')],
-                       stderr=sys.stderr,
-                       stdout=sys.stdout,
-                       check=True)
-    else:
-        subprocess.run(['aws', 'sso', 'login', '--profile', str(profile).lstrip('profile ')],
-                       stderr=sys.stderr,
-                       stdout=sys.stdout,
-                       check=True)
+    cmd = DOCKER_CMD if docker else ['aws']
+    subprocess.run(cmd + ['sso', 'login', '--profile', str(profile).lstrip('profile ')],
+                   stderr=sys.stderr,
+                   stdout=sys.stdout,
+                   check=True)
 
 
 def _print_colour(colour, message, always=False):
