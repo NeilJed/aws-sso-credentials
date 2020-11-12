@@ -48,11 +48,11 @@ sso_role_name = DevOps
   aws sso login --profile dev-env
 ```
 
-4. Copy the `awssso` script to somewhere you can run it. Usually somewhere on your `%PATH%` or make a symlink to it from somewhere like `/usr/local/bin`. Make sure to make it executeable, i.e. `chmod ug+w awssso`.
+4. Copy the `awssso` script to somewhere you can run it. Usually somewhere on your `%PATH%` or make a symlink to it from somewhere like `/usr/local/bin`. Make sure to make it executable, i.e. `chmod ug+w awssso`.
 
 That's it. You should be good to go.
 
-## Useage
+## Usage
 
 You can run `awssso` passing it the name of the profile you want credentials for.
 
@@ -86,6 +86,7 @@ If you want to avoid having to set a profile, use the `-d` option detailed below
 - `-h, --help` - Show help and a list of command line options.
 - `-v, --verbose` Verbose mode. Tells you what the script is doing and dumps information about when your SSO credentials and temporary credentials expire.
 - `--login` Invokes the AWS CLI to perform a SSO login and refresh SSO credentials.
+- `--docker` Use the Docker version of the AWS CLI
 - `-d, --use-default` Copies the chosen profile and credentials to the default profile. This removes the need to pass a profile name or export the `AWS_PROFILE` environment variable.
 
 ## Example
