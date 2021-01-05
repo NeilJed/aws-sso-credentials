@@ -11,7 +11,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import boto3
-import inquirer
+import inquirergit
+from dateutil.parser import parse
+from dateutil.tz import UTC, tzlocal
 
 VERBOSE_MODE = False
 DOCKER_CMD = ['docker', 'run', '--rm', '-t', '-v', f'{Path.home()}/.aws:/root/.aws', 'amazon/aws-cli']
@@ -67,6 +69,7 @@ def main():
         if 'aws-cli/2' not in aws_version:
             _print_error('\n AWS CLI Version 2 not found. Please install. Exiting.')
             exit(1)
+
     except Exception as e:
         _print_error(
             f'\nAn error occured trying to find AWS CLI version. Do you have AWS CLI Version 2 installed?\n{e}')
@@ -115,20 +118,21 @@ def _get_sso_cached_login(profile):
 
     else:
         data = _load_json(sso_cache_file)
-        expires_at = _parse_time(data['expiresAt'])
+        now = datetime.now().astimezone(UTC)
+        expires_at = parse(data['expiresAt']).astimezone(UTC)
 
         if data.get('region') != profile['sso_region']:
             _print_error(
                 'SSO authentication region in cache does not match region defined in profile')
 
-        if datetime.utcnow() > expires_at:
+        if now > expires_at:
             _print_error(
                 'SSO credentials have expired. Please re-validate with the AWS CLI tool or --login option.')
 
-        if (datetime.utcnow() + timedelta(minutes=15)) >= expires_at:
+        if (now + timedelta(minutes=15)) >= expires_at:
             _print_warn('Your current SSO credentials will expire in less than 15 minutes!')
 
-        _print_success(f'Found credentials. Valid until {expires_at} UTC')
+        _print_success(f'Found credentials. Valid until {expires_at.astimezone(tzlocal())}')
         return data
 
 
@@ -142,8 +146,8 @@ def _get_sso_role_credentials(profile, login):
         accessToken=login['accessToken'],
     )
 
-    expires = datetime.utcfromtimestamp(response['roleCredentials']['expiration'] / 1000.0)
-    _print_success(f'Got session token. Valid until {expires} UTC')
+    expires = datetime.utcfromtimestamp(response['roleCredentials']['expiration'] / 1000.0).astimezone(UTC)
+    _print_success(f'Got session token. Valid until {expires.astimezone(tzlocal())}')
 
     return response["roleCredentials"]
 
@@ -236,10 +240,6 @@ def _print_success(message):
 
 def _add_prefix(name):
     return f'profile {name}' if name != 'default' else 'default'
-
-
-def _parse_time(timestring):
-    return datetime.strptime(timestring, "%Y-%m-%dT%H:%M:%SUTC")
 
 
 def _read_config(path):
