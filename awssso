@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import boto3
-import inquirergit
+import inquirer
 from dateutil.parser import parse
 from dateutil.tz import UTC, tzlocal
 
