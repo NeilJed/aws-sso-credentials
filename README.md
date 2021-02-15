@@ -48,7 +48,7 @@ sso_role_name = DevOps
   aws sso login --profile dev-env
 ```
 
-4. Copy the `awssso` script to somewhere you can run it. Usually somewhere on your `%PATH%` or make a symlink to it from somewhere like `/usr/local/bin`. Make sure to make it executable, i.e. `chmod ug+w awssso`.
+4. Copy the `awssso` script to somewhere you can run it. Usually somewhere on your `%PATH%` or make a symlink to it from somewhere like `/usr/local/bin`. Make sure to make it executable, i.e. `chmod ug+x awssso`.
 
 That's it. You should be good to go.
 
