@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from configparser import ConfigParser
@@ -191,7 +192,7 @@ def _select_profile():
 
     profiles = []
     for section in config.sections():
-        profiles.append(str(section).lstrip('profile '))
+        profiles.append(re.sub(r"^profile ", "", str(section)))
     profiles.sort()
 
     questions = [
@@ -207,7 +208,7 @@ def _select_profile():
 
 def _spawn_cli_for_auth(profile, docker=False):
     cmd = DOCKER_CMD if docker else ['aws']
-    subprocess.run(cmd + ['sso', 'login', '--profile', str(profile).lstrip('profile ')],
+    subprocess.run(cmd + ['sso', 'login', '--profile', re.sub(r"^profile ", "", str(profile))],
                    stderr=sys.stderr,
                    stdout=sys.stdout,
                    check=True)
