@@ -22,7 +22,7 @@ DOCKER_CMD = ['docker', 'run', '--rm', '-t', '-v', f'{Path.home()}/.aws:/root/.a
 AWS_CONFIG_PATH = f'{Path.home()}/.aws/config'
 AWS_CREDENTIAL_PATH = f'{Path.home()}/.aws/credentials'
 AWS_SSO_CACHE_PATH = f'{Path.home()}/.aws/sso/cache'
-AWS_DEFAULT_REGION = 'eu-west-1'
+AWS_DEFAULT_REGION = 'us-east-1'
 
 
 class Colour:
@@ -39,7 +39,7 @@ class Colour:
 def main():
     parser = argparse.ArgumentParser(description='Retrieves AWS credentials from SSO for use with CLI/Boto3 apps.')
 
-    parser.add_argument('profile',
+    parser.add_argument('--profile', '-p',
                         action='store',
                         nargs='?',
                         help='AWS config profile to retrieve credentials for.')
@@ -60,6 +60,10 @@ def main():
                         action='store_true',
                         help='Use the docker version of the AWS CLI')
 
+    parser.add_argument('--all', '-a',
+                        action='store_true',
+                        help='Populates credentials for all SSO profiles')
+
     args = parser.parse_args()
 
     # validate aws v2
@@ -79,31 +83,47 @@ def main():
     global VERBOSE_MODE
     VERBOSE_MODE = args.verbose
 
-    profile = _add_prefix(args.profile if args.profile else _select_profile())
+    if args.all:
+        profiles, sso_profile = _get_all_profiles()
+        
+        if args.login:
+            _spawn_cli_for_auth(sso_profile, args.docker)
 
-    if args.login:
-        _spawn_cli_for_auth(profile, args.docker)
+        for profile in profiles:
+            _set_profile_credentials(profile, False)
 
-    _set_profile_credentials(profile, args.use_default if profile != 'default' else False)
+    else:
+        profile = _add_prefix(args.profile if args.profile else _select_profile())
+
+        if args.login:
+            _spawn_cli_for_auth(profile, args.docker)
+
+        _set_profile_credentials(profile, args.use_default if profile != 'default' else False)
 
 
 def _set_profile_credentials(profile_name, use_default=False):
     profile_opts = _get_aws_profile(profile_name)
-    cache_login = _get_sso_cached_login(profile_opts)
-    credentials = _get_sso_role_credentials(profile_opts, cache_login)
 
-    if not use_default:
-        _store_aws_credentials(profile_name, profile_opts, credentials)
-    else:
-        _store_aws_credentials('default', profile_opts, credentials)
-        _copy_to_default_profile(profile_name)
+    if profile_opts != "NotSSO":
+        cache_login = _get_sso_cached_login(profile_opts)
+        credentials = _get_sso_role_credentials(profile_opts, cache_login)
+
+        if not use_default:
+            _store_aws_credentials(profile_name, profile_opts, credentials)
+        else:
+            _store_aws_credentials('default', profile_opts, credentials)
+            _copy_to_default_profile(profile_name)
 
 
 def _get_aws_profile(profile_name):
     _print_msg(f'\nReading profile: [{profile_name}]')
     config = _read_config(AWS_CONFIG_PATH)
     profile_opts = config.items(profile_name)
-    profile = dict(profile_opts)
+    if "sso_start_url" in dict(profile_opts):
+        profile = dict(profile_opts)
+    else:
+        _print_msg(f'\n [{profile_name}] is not an SSO profile')
+        profile = "NotSSO"
     return profile
 
 
@@ -213,6 +233,21 @@ def _spawn_cli_for_auth(profile, docker=False):
                    stdout=sys.stdout,
                    check=True)
 
+def _get_all_profiles():
+    config = _read_config(AWS_CONFIG_PATH)
+
+    profiles = []
+
+    for section in config.sections():
+        profiles.append(str(section))
+    profiles.sort()
+    
+    for profile_name in profiles:
+        profile_opts = config.items(profile_name)
+        if "sso_start_url" in dict(profile_opts):
+            sso_profile = profile_name
+
+    return(profiles, sso_profile)
 
 def _print_colour(colour, message, always=False):
     if always or VERBOSE_MODE:
