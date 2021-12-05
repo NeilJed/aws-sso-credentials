@@ -109,6 +109,7 @@ def _set_profile_credentials(profile_name, use_default=False):
         credentials = _get_sso_role_credentials(profile_opts, cache_login)
 
         if not use_default:
+            profile_name = re.sub(r"^profile ", "", profile_name)
             _store_aws_credentials(profile_name, profile_opts, credentials)
         else:
             _store_aws_credentials('default', profile_opts, credentials)
