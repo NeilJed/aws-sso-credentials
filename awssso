@@ -66,6 +66,9 @@ def main():
 
     args = parser.parse_args()
 
+    if args.all and args.use_default:
+        print("--use-default will ignored when --all is selected")
+
     # validate aws v2
     try:
         cmd = DOCKER_CMD if args.docker else ['aws']
@@ -90,7 +93,7 @@ def main():
             _spawn_cli_for_auth(sso_profile, args.docker)
 
         for profile in profiles:
-            _set_profile_credentials(profile, False)
+            _set_profile_credentials(profile, False, args.all)
 
     else:
         profile = _add_prefix(args.profile if args.profile else _select_profile())
@@ -98,10 +101,10 @@ def main():
         if args.login:
             _spawn_cli_for_auth(profile, args.docker)
 
-        _set_profile_credentials(profile, args.use_default if profile != 'default' else False)
+        _set_profile_credentials(profile, args.use_default if profile != 'default' else False, args.all)
 
 
-def _set_profile_credentials(profile_name, use_default=False):
+def _set_profile_credentials(profile_name, use_default=False, set_all=False):
     profile_opts = _get_aws_profile(profile_name)
 
     if profile_opts != "NotSSO":
@@ -111,10 +114,9 @@ def _set_profile_credentials(profile_name, use_default=False):
         if not use_default:
             profile_name = re.sub(r"^profile ", "", profile_name)
             _store_aws_credentials(profile_name, profile_opts, credentials)
-        else:
+        elif use_default and not set_all:
             _store_aws_credentials('default', profile_opts, credentials)
             _copy_to_default_profile(profile_name)
-
 
 def _get_aws_profile(profile_name):
     _print_msg(f'\nReading profile: [{profile_name}]')
