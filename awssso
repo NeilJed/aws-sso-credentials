@@ -146,7 +146,7 @@ def _get_sso_cached_login(profile, profile_name):
 
     if not Path(sso_cache_file).is_file():
         _print_error(
-            f'Current cached SSO login is invalid/missing for [profile {profile_name}]. Login with the AWS CLI tool or use --login')
+            f'Current cached SSO login is invalid/missing for [{profile_name}]. Login with the AWS CLI tool or use --login')
 
     else:
         data = _load_json(sso_cache_file)
@@ -155,14 +155,14 @@ def _get_sso_cached_login(profile, profile_name):
 
         if data.get('region') != profile['sso_region']:
             _print_error(
-                f'SSO authentication region in cache does not match region defined in [profile {profile_name}]')
+                f'SSO authentication region in cache does not match region defined in [{profile_name}]')
 
         if now > expires_at:
             _print_error(
-                f'SSO credentials have expired for [profile {profile_name}]. Please re-validate with the AWS CLI tool or --login option.')
+                f'SSO credentials have expired for [{profile_name}]. Please re-validate with the AWS CLI tool or --login option.')
 
         if (now + timedelta(minutes=15)) >= expires_at:
-            _print_warn(f'Your current SSO credentials will expire in less than 15 minutes! for [profile {profile_name}]')
+            _print_warn(f'Your current SSO credentials will expire in less than 15 minutes! for [{profile_name}]')
 
         _print_success(f'Found credentials. Valid until {expires_at.astimezone(tzlocal())}')
         return data
