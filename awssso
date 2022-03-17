@@ -3,7 +3,6 @@
 import argparse
 import hashlib
 import json
-from multiprocessing.connection import wait
 import os
 import re
 import subprocess
@@ -117,7 +116,7 @@ def _set_profile_credentials(profile_name, use_default=False, set_all=False):
     profile_opts = _get_aws_profile(profile_name)
 
     if profile_opts != "NotSSO":
-        cache_login = _get_sso_cached_login(profile_opts)
+        cache_login = _get_sso_cached_login(profile_opts, profile_name)
         credentials = _get_sso_role_credentials(profile_opts, cache_login)
 
         if not use_default:
@@ -139,7 +138,7 @@ def _get_aws_profile(profile_name):
     return profile
 
 
-def _get_sso_cached_login(profile):
+def _get_sso_cached_login(profile, profile_name):
     _print_msg('\nChecking for SSO credentials...')
 
     cache = hashlib.sha1(profile["sso_start_url"].encode("utf-8")).hexdigest()
@@ -147,7 +146,7 @@ def _get_sso_cached_login(profile):
 
     if not Path(sso_cache_file).is_file():
         _print_error(
-            'Current cached SSO login is invalid/missing. Login with the AWS CLI tool or use --login')
+            f'Current cached SSO login is invalid/missing for [profile {profile_name}]. Login with the AWS CLI tool or use --login')
 
     else:
         data = _load_json(sso_cache_file)
@@ -156,14 +155,14 @@ def _get_sso_cached_login(profile):
 
         if data.get('region') != profile['sso_region']:
             _print_error(
-                'SSO authentication region in cache does not match region defined in profile')
+                f'SSO authentication region in cache does not match region defined in [profile {profile_name}]')
 
         if now > expires_at:
             _print_error(
-                'SSO credentials have expired. Please re-validate with the AWS CLI tool or --login option.')
+                f'SSO credentials have expired for [profile {profile_name}]. Please re-validate with the AWS CLI tool or --login option.')
 
         if (now + timedelta(minutes=15)) >= expires_at:
-            _print_warn('Your current SSO credentials will expire in less than 15 minutes!')
+            _print_warn(f'Your current SSO credentials will expire in less than 15 minutes! for [profile {profile_name}]')
 
         _print_success(f'Found credentials. Valid until {expires_at.astimezone(tzlocal())}')
         return data
