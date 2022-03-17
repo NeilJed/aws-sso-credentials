@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+from multiprocessing.connection import wait
 import os
 import re
 import subprocess
@@ -87,11 +88,19 @@ def main():
     VERBOSE_MODE = args.verbose
 
     if args.all:
-        profiles, sso_profile = _get_all_profiles()
-        
-        if args.login:
-            _spawn_cli_for_auth(sso_profile, args.docker)
+        profiles, sso_profiles_name = _get_all_profiles()
 
+        if args.login:
+            if len(sso_profiles_name) > 1:
+                _print_warn(f"You have {len(sso_profiles_name)} different SSO start URLs in your config file.")
+                _print_warn(f"AWS CLI will prompt you to login {len(sso_profiles_name)} times to get credentials for all SSO organizations")
+            for sso_profile in sso_profiles_name:
+                _spawn_cli_for_auth(sso_profile, args.docker)
+
+        if len(sso_profiles_name) > 1 and not args.login:
+            _print_warn(f"You have {len(sso_profiles_name)} different SSO start URLs in your config file.")
+            _print_warn(f"All your credentials might not be up to date so if you receive a credentials error, use --login --all to login to all organizations")
+      
         for profile in profiles:
             _set_profile_credentials(profile, False, args.all)
 
@@ -240,6 +249,8 @@ def _get_all_profiles():
     config = _read_config(AWS_CONFIG_PATH)
 
     profiles = []
+    sso_profiles = []
+    sso_profiles_name = []
 
     for section in config.sections():
         profiles.append(str(section))
@@ -248,9 +259,11 @@ def _get_all_profiles():
     for profile_name in profiles:
         profile_opts = config.items(profile_name)
         if "sso_start_url" in dict(profile_opts):
-            sso_profile = profile_name
+            if str(dict(profile_opts)['sso_start_url']) not in sso_profiles:
+                sso_profiles.append(str(dict(profile_opts)['sso_start_url']))
+                sso_profiles_name.append(profile_name)
 
-    return(profiles, sso_profile)
+    return(profiles, sso_profiles_name)
 
 def _print_colour(colour, message, always=False):
     if always or VERBOSE_MODE:
