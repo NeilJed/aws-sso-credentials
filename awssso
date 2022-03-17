@@ -99,7 +99,7 @@ def main():
         if len(sso_profiles_name) > 1 and not args.login:
             _print_warn(f"You have {len(sso_profiles_name)} different SSO start URLs in your config file.")
             _print_warn(f"All your credentials might not be up to date so if you receive a credentials error, use --login --all to login to all organizations")
-      
+        
         for profile in profiles:
             _set_profile_credentials(profile, False, args.all)
 
