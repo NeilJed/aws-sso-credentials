@@ -48,7 +48,7 @@ sso_role_name = DevOps
   aws sso login --profile dev-env
 ```
 
-4. Copy the `awssso` script to somewhere you can run it. Usually somewhere on your `%PATH%` or make a symlink to it from somewhere like `/usr/local/bin`. Make sure to make it executable, i.e. `chmod ug+x awssso`.
+3. Copy the `awssso` script to somewhere you can run it. Usually somewhere on your `%PATH%` or make a symlink to it from somewhere like `/usr/local/bin`. Make sure to make it executable, i.e. `chmod ug+x awssso`.
 
 That's it. You should be good to go.
 
@@ -57,7 +57,7 @@ That's it. You should be good to go.
 You can run `awssso` passing it the name of the profile you want credentials for.
 
 ```bash
-  $ awssso dev-env
+  $ awssso --profile dev-env
 ```
 
 If you don't pass a profile name it will allow you to select from a list:
