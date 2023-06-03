@@ -1,3 +1,4 @@
 boto3 >= 1.12.6
 inquirer >= 2.6.3
 python-dateutil >=2.8.1
+prompt_toolkit >=3.0

@@ -11,6 +11,9 @@ from configparser import ConfigParser
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from prompt_toolkit import prompt
+from prompt_toolkit.completion import FuzzyWordCompleter
+
 import boto3
 import inquirer
 from dateutil.parser import parse
@@ -48,9 +51,9 @@ def main():
                         action='store_true',
                         help='Show verbose output, messages, etc.')
 
-    parser.add_argument('--use-default', '-d',
+    parser.add_argument('--not-use-default', '-nd',
                         action='store_true',
-                        help='Clones selected profile and credentials into the default profile.')
+                        help='Do not clone selected profile and credentials into the default profile. By default the selected profile is clone into the default profile')
 
     parser.add_argument('--login',
                         action='store_true',
@@ -84,15 +87,15 @@ def main():
     if args.login:
         _spawn_cli_for_auth(profile, args.docker)
 
-    _set_profile_credentials(profile, args.use_default if profile != 'default' else False)
+    _set_profile_credentials(profile, args.not_use_default)
 
 
-def _set_profile_credentials(profile_name, use_default=False):
+def _set_profile_credentials(profile_name, not_use_default=False):
     profile_opts = _get_aws_profile(profile_name)
     cache_login = _get_sso_cached_login(profile_opts)
     credentials = _get_sso_role_credentials(profile_opts, cache_login)
 
-    if not use_default:
+    if not_use_default:
         _store_aws_credentials(profile_name, profile_opts, credentials)
     else:
         _store_aws_credentials('default', profile_opts, credentials)
@@ -195,15 +198,11 @@ def _select_profile():
         profiles.append(re.sub(r"^profile ", "", str(section)))
     profiles.sort()
 
-    questions = [
-        inquirer.List(
-            'name',
-            message='Please select an AWS config profile',
-            choices=profiles
-        ),
-    ]
-    answer = inquirer.prompt(questions)
-    return answer['name'] if answer else sys.exit(1)
+    profile_completer = FuzzyWordCompleter(profiles)
+    
+    answer = prompt('AWS Profile > ', completer = profile_completer, complete_while_typing=True)
+
+    return answer if answer else sys.exit(1)
 
 
 def _spawn_cli_for_auth(profile, docker=False):
