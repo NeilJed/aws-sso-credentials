@@ -50,8 +50,7 @@ If you don't pass a profile name it will allow you to select from a list:
  > dev-env
    prod-env
 ```
-
-[![asciicast](https://asciinema.org/a/fzd8ycpMIxfwwWpnMu4SV7uyE.svg)](https://asciinema.org/a/fzd8ycpMIxfwwWpnMu4SV7uyE)
+![usage](render1685751367649.gif)
 
 Once the profile is selected, the script will check if you're current SSO credentials are valid and warn you if they will expire soon. It will then use these credentials to get the short term-credentials and copy them to your `.aws/credentials` file.
 
