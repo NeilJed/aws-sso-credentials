@@ -48,7 +48,7 @@ sso_role_name = DevOps
   aws sso login --profile dev-env
 ```
 
-4. Copy the `awssso` script to somewhere you can run it. Usually somewhere on your `%PATH%` or make a symlink to it from somewhere like `/usr/local/bin`. Make sure to make it executable, i.e. `chmod ug+x awssso`.
+3. Copy the `awssso` script to somewhere you can run it. Usually somewhere on your `%PATH%` or make a symlink to it from somewhere like `/usr/local/bin`. Make sure to make it executable, i.e. `chmod ug+x awssso`.
 
 That's it. You should be good to go.
 
@@ -57,7 +57,7 @@ That's it. You should be good to go.
 You can run `awssso` passing it the name of the profile you want credentials for.
 
 ```bash
-  $ awssso dev-env
+  $ awssso --profile dev-env
 ```
 
 If you don't pass a profile name it will allow you to select from a list:
@@ -88,6 +88,7 @@ If you want to avoid having to set a profile, use the `-d` option detailed below
 - `--login` Invokes the AWS CLI to perform a SSO login and refresh SSO credentials.
 - `--docker` Use the Docker version of the AWS CLI
 - `-d, --use-default` Copies the chosen profile and credentials to the default profile. This removes the need to pass a profile name or export the `AWS_PROFILE` environment variable.
+- `-a, --all` gets temporary credentials for all SSO profiles
 
 ## Example
 
@@ -117,4 +118,39 @@ Here is a simple example that I use in my own day-to-day routine.
 
   Adding to credential files under [default]
   Copying profile [profile dev-env] to [default]
+```
+
+```
+  $ awssso --login -v -all
+
+  Attempting to automatically open the SSO authorization page in your default browser.
+  If the browser does not open or you wish to use a different device to authorize this request,
+  open the following URL:
+
+  https://device.sso.eu-west-1.amazonaws.com/
+
+  Then enter the code:
+
+  ABCD-WXYZ
+  Successully logged into Start URL: https://yoursso.awsapps.com/start
+
+  Reading profile: [profile dev-env]
+
+  Checking for SSO credentials...
+  Found credentials. Valid until 2020-05-01 22:32:11 UTC
+
+  Fetching short-term CLI/Boto3 session token...
+  Got session token. Valid until 2020-05-01 18:32:11 UTC
+
+  Adding to credential files under [dev-env]
+
+  Reading profile: [profile prod-env]
+
+  Checking for SSO credentials...
+  Found credentials. Valid until 2020-05-01 22:32:11 UTC
+
+  Fetching short-term CLI/Boto3 session token...
+  Got session token. Valid until 2020-05-01 18:32:11 UTC
+
+  Adding to credential files under [prod-env]
 ```

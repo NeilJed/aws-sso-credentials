@@ -22,7 +22,7 @@ DOCKER_CMD = ['docker', 'run', '--rm', '-t', '-v', f'{Path.home()}/.aws:/root/.a
 AWS_CONFIG_PATH = f'{Path.home()}/.aws/config'
 AWS_CREDENTIAL_PATH = f'{Path.home()}/.aws/credentials'
 AWS_SSO_CACHE_PATH = f'{Path.home()}/.aws/sso/cache'
-AWS_DEFAULT_REGION = 'eu-west-1'
+AWS_DEFAULT_REGION = 'us-east-1'
 
 
 class Colour:
@@ -39,7 +39,7 @@ class Colour:
 def main():
     parser = argparse.ArgumentParser(description='Retrieves AWS credentials from SSO for use with CLI/Boto3 apps.')
 
-    parser.add_argument('profile',
+    parser.add_argument('--profile', '-p',
                         action='store',
                         nargs='?',
                         help='AWS config profile to retrieve credentials for.')
@@ -60,7 +60,14 @@ def main():
                         action='store_true',
                         help='Use the docker version of the AWS CLI')
 
+    parser.add_argument('--all', '-a',
+                        action='store_true',
+                        help='Populates credentials for all SSO profiles')
+
     args = parser.parse_args()
+
+    if args.all and args.use_default:
+        print("--use-default will ignored when --all is selected")
 
     # validate aws v2
     try:
@@ -79,35 +86,59 @@ def main():
     global VERBOSE_MODE
     VERBOSE_MODE = args.verbose
 
-    profile = _add_prefix(args.profile if args.profile else _select_profile())
+    if args.all:
+        profiles, sso_profiles_name = _get_all_profiles()
 
-    if args.login:
-        _spawn_cli_for_auth(profile, args.docker)
+        if args.login:
+            if len(sso_profiles_name) > 1:
+                _print_warn(f"You have {len(sso_profiles_name)} different SSO start URLs in your config file.")
+                _print_warn(f"AWS CLI will prompt you to login {len(sso_profiles_name)} times to get credentials for all SSO organizations")
+            for sso_profile in sso_profiles_name:
+                _spawn_cli_for_auth(sso_profile, args.docker)
 
-    _set_profile_credentials(profile, args.use_default if profile != 'default' else False)
+        if len(sso_profiles_name) > 1 and not args.login:
+            _print_warn(f"You have {len(sso_profiles_name)} different SSO start URLs in your config file.")
+            _print_warn(f"All your credentials might not be up to date so if you receive a credentials error, use --login --all to login to all organizations")
+        
+        for profile in profiles:
+            _set_profile_credentials(profile, False, args.all)
 
-
-def _set_profile_credentials(profile_name, use_default=False):
-    profile_opts = _get_aws_profile(profile_name)
-    cache_login = _get_sso_cached_login(profile_opts)
-    credentials = _get_sso_role_credentials(profile_opts, cache_login)
-
-    if not use_default:
-        _store_aws_credentials(profile_name, profile_opts, credentials)
     else:
-        _store_aws_credentials('default', profile_opts, credentials)
-        _copy_to_default_profile(profile_name)
+        profile = _add_prefix(args.profile if args.profile else _select_profile())
 
+        if args.login:
+            _spawn_cli_for_auth(profile, args.docker)
+
+        _set_profile_credentials(profile, args.use_default if profile != 'default' else False, args.all)
+
+
+def _set_profile_credentials(profile_name, use_default=False, set_all=False):
+    profile_opts = _get_aws_profile(profile_name)
+
+    if profile_opts != "NotSSO":
+        cache_login = _get_sso_cached_login(profile_opts, profile_name)
+        credentials = _get_sso_role_credentials(profile_opts, cache_login)
+
+        if not use_default:
+            profile_name = re.sub(r"^profile ", "", profile_name)
+            _store_aws_credentials(profile_name, profile_opts, credentials)
+        elif use_default and not set_all:
+            _store_aws_credentials('default', profile_opts, credentials)
+            _copy_to_default_profile(profile_name)
 
 def _get_aws_profile(profile_name):
     _print_msg(f'\nReading profile: [{profile_name}]')
     config = _read_config(AWS_CONFIG_PATH)
     profile_opts = config.items(profile_name)
-    profile = dict(profile_opts)
+    if "sso_start_url" in dict(profile_opts):
+        profile = dict(profile_opts)
+    else:
+        _print_msg(f'\n [{profile_name}] is not an SSO profile')
+        profile = "NotSSO"
     return profile
 
 
-def _get_sso_cached_login(profile):
+def _get_sso_cached_login(profile, profile_name):
     _print_msg('\nChecking for SSO credentials...')
 
     cache = hashlib.sha1(profile["sso_start_url"].encode("utf-8")).hexdigest()
@@ -115,7 +146,7 @@ def _get_sso_cached_login(profile):
 
     if not Path(sso_cache_file).is_file():
         _print_error(
-            'Current cached SSO login is invalid/missing. Login with the AWS CLI tool or use --login')
+            f'Current cached SSO login is invalid/missing for [{profile_name}]. Login with the AWS CLI tool or use --login')
 
     else:
         data = _load_json(sso_cache_file)
@@ -124,14 +155,14 @@ def _get_sso_cached_login(profile):
 
         if data.get('region') != profile['sso_region']:
             _print_error(
-                'SSO authentication region in cache does not match region defined in profile')
+                f'SSO authentication region in cache does not match region defined in [{profile_name}]')
 
         if now > expires_at:
             _print_error(
-                'SSO credentials have expired. Please re-validate with the AWS CLI tool or --login option.')
+                f'SSO credentials have expired for [{profile_name}]. Please re-validate with the AWS CLI tool or --login option.')
 
         if (now + timedelta(minutes=15)) >= expires_at:
-            _print_warn('Your current SSO credentials will expire in less than 15 minutes!')
+            _print_warn(f'Your current SSO credentials will expire in less than 15 minutes! for [{profile_name}]')
 
         _print_success(f'Found credentials. Valid until {expires_at.astimezone(tzlocal())}')
         return data
@@ -213,6 +244,25 @@ def _spawn_cli_for_auth(profile, docker=False):
                    stdout=sys.stdout,
                    check=True)
 
+def _get_all_profiles():
+    config = _read_config(AWS_CONFIG_PATH)
+
+    profiles = []
+    sso_profiles = []
+    sso_profiles_name = []
+
+    for section in config.sections():
+        profiles.append(str(section))
+    profiles.sort()
+    
+    for profile_name in profiles:
+        profile_opts = config.items(profile_name)
+        if "sso_start_url" in dict(profile_opts):
+            if str(dict(profile_opts)['sso_start_url']) not in sso_profiles:
+                sso_profiles.append(str(dict(profile_opts)['sso_start_url']))
+                sso_profiles_name.append(profile_name)
+
+    return(profiles, sso_profiles_name)
 
 def _print_colour(colour, message, always=False):
     if always or VERBOSE_MODE:
