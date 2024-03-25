@@ -92,9 +92,8 @@ def _set_profile_credentials(profile_name, use_default=False):
     cache_login = _get_sso_cached_login(profile_opts)
     credentials = _get_sso_role_credentials(profile_opts, cache_login)
 
-    if not use_default:
-        _store_aws_credentials(profile_name, profile_opts, credentials)
-    else:
+    _store_aws_credentials(profile_name, profile_opts, credentials)
+    if use_default:
         _store_aws_credentials('default', profile_opts, credentials)
         _copy_to_default_profile(profile_name)
 
@@ -154,7 +153,7 @@ def _get_sso_role_credentials(profile, login):
 
 
 def _store_aws_credentials(profile_name, profile_opts, credentials):
-    _print_msg(f'\nAdding to credential files under [{profile_name}]')
+    _print_msg(f'Adding to credential files under [{profile_name}]')
 
     region = profile_opts.get("region", AWS_DEFAULT_REGION)
     config = _read_config(AWS_CREDENTIAL_PATH)
@@ -181,7 +180,7 @@ def _copy_to_default_profile(profile_name):
 
     config.add_section('default')
 
-    for key, value in config.items(profile_name):
+    for key, value in config.items(_add_prefix(profile_name)):
         config.set('default', key, value)
 
     _write_config(AWS_CONFIG_PATH, config)
