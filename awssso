@@ -79,7 +79,7 @@ def main():
     global VERBOSE_MODE
     VERBOSE_MODE = args.verbose
 
-    profile = _add_prefix(args.profile if args.profile else _select_profile())
+    profile = args.profile if args.profile else _select_profile()
 
     if args.login:
         _spawn_cli_for_auth(profile, args.docker)
@@ -101,7 +101,7 @@ def _set_profile_credentials(profile_name, use_default=False):
 def _get_aws_profile(profile_name):
     _print_msg(f'\nReading profile: [{profile_name}]')
     config = _read_config(AWS_CONFIG_PATH)
-    profile_opts = config.items(profile_name)
+    profile_opts = config.items(_add_prefix(profile_name))
     profile = dict(profile_opts)
     return profile
 
