@@ -147,8 +147,8 @@ def _get_sso_role_credentials(profile, login):
         accessToken=login['accessToken'],
     )
 
-    expires = datetime.utcfromtimestamp(response['roleCredentials']['expiration'] / 1000.0).astimezone(UTC)
-    _print_success(f'Got session token. Valid until {expires.astimezone(tzlocal())}')
+    expires = datetime.fromtimestamp(response['roleCredentials']['expiration'] / 1000.0, tz=UTC)
+    _print_success(f'Got session token. Valid until {expires.astimezone(tzlocal())} (Local time)')
 
     return response["roleCredentials"]
 
