@@ -73,7 +73,7 @@ def main():
 
     except Exception as e:
         _print_error(
-            f'\nAn error occured trying to find AWS CLI version. Do you have AWS CLI Version 2 installed?\n{e}')
+            f'\nAn error occurred trying to find AWS CLI version. Do you have AWS CLI Version 2 installed?\n{e}')
         exit(1)
 
     global VERBOSE_MODE
