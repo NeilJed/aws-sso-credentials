@@ -1,6 +1,6 @@
 [project]
 name = "aws-sso-credentials"
-version = "1.1.0"
+version = "1.1.1"
 description = "Retrieves AWS credentials from SSO for use with CLI/Boto3 apps."
 readme = "README.md"
 license = { file = "LICENSE" }
