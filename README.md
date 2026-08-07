@@ -5,7 +5,7 @@
 ## Motivation
 In my organisation we use various CLI/Boto3 based tools with AWS. We have several accounts/roles and need a way to handle MFA, switch between accounts/roles, grab temporary session credentials and make sure they're up to date. To this end our go-to tool of choice was [Limes](https://github.com/otm/limes).
 
-We switched to using [AWS SSO](https://aws.amazon.com/single-sign-on/) linked to our Azure AD to centralise user management. This works great for Single-Sign-On but and the new AWS CLI v2 supports AWS SSO natively. However, getting temporary credentials for use with Boto3 based apps, especially one that doesn't support profiles was a pain involving copying credentials from a web portal, exporting environment variables and a lot of error prone manual steps.
+We switched to using [AWS SSO](https://aws.amazon.com/single-sign-on/) linked to our Azure AD to centralise user management. This works great for Single-Sign-On and the new AWS CLI v2 supports AWS SSO natively. However, getting temporary credentials for use with Boto3 based apps, especially one that doesn't support profiles was a pain involving copying credentials from a web portal, exporting environment variables and a lot of error prone manual steps.
 
 This script is a quick work around to give us something functional that fits with our way of working until something better comes along. Maybe it works for you too.
 
