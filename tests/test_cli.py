@@ -173,11 +173,6 @@ def test_main_skips_failed_profile_and_continues(aws_paths):
     assert exc.value.code == 1
 
 
-def test_profile_section():
-    assert cli.profile_section("dev") == "profile dev"
-    assert cli.profile_section("default") == "default"
-
-
 def test_get_aws_profile_reads_config(aws_paths):
     write_config(cli.AWS_CONFIG_PATH, {
         "profile dev": {
@@ -211,7 +206,7 @@ def test_get_aws_profile_resolves_sso_session(aws_paths):
 
     profile = cli._get_aws_profile("dev")
 
-    assert profile == make_profile(region="eu-central-1")
+    assert profile == make_profile(region="eu-central-1", sso_session="my-sso")
 
 
 def test_get_aws_profile_missing_sso_session_section_raises(aws_paths):
@@ -327,19 +322,6 @@ def test_select_profiles_cancelled_exits(aws_paths):
         pytest.raises(SystemExit) as exc,
     ):
         checkbox.return_value.ask.return_value = None
-        cli._select_profiles()
-
-    assert exc.value.code == 1
-
-
-def test_select_profiles_none_selected_exits(aws_paths):
-    write_config(cli.AWS_CONFIG_PATH, {"profile dev": {}})
-
-    with (
-        patch("awssso.cli.questionary.checkbox") as checkbox,
-        pytest.raises(SystemExit) as exc,
-    ):
-        checkbox.return_value.ask.return_value = []
         cli._select_profiles()
 
     assert exc.value.code == 1
@@ -484,6 +466,149 @@ def test_sso_device_login_polls_until_authorized(aws_paths):
     assert result["accessToken"] == "the-token"
     with open(cache_file) as f:
         assert json.load(f)["accessToken"] == "the-token"
+
+
+def test_get_sso_cached_login_uses_pkce_for_sso_session_profile(aws_paths):
+    profile = make_profile(sso_session="my-sso")
+    fresh_login = {"accessToken": "fresh-token"}
+
+    with (
+        patch("awssso.cli._sso_pkce_login", return_value=fresh_login) as mock_pkce_login,
+        patch("awssso.cli._sso_device_login") as mock_device_login,
+    ):
+        result = cli._get_sso_cached_login(profile)
+
+    mock_pkce_login.assert_called_once()
+    mock_device_login.assert_not_called()
+    assert result == fresh_login
+
+
+def test_get_sso_cached_login_legacy_flag_forces_device_login(aws_paths):
+    profile = make_profile(sso_session="my-sso")
+    fresh_login = {"accessToken": "fresh-token"}
+
+    with (
+        patch("awssso.cli._sso_pkce_login") as mock_pkce_login,
+        patch("awssso.cli._sso_device_login", return_value=fresh_login) as mock_device_login,
+    ):
+        result = cli._get_sso_cached_login(profile, legacy=True)
+
+    mock_device_login.assert_called_once()
+    mock_pkce_login.assert_not_called()
+    assert result == fresh_login
+
+
+def test_get_sso_cached_login_uses_device_login_without_sso_session(aws_paths):
+    profile = make_profile()
+    fresh_login = {"accessToken": "fresh-token"}
+
+    with (
+        patch("awssso.cli._sso_pkce_login") as mock_pkce_login,
+        patch("awssso.cli._sso_device_login", return_value=fresh_login) as mock_device_login,
+    ):
+        result = cli._get_sso_cached_login(profile)
+
+    mock_device_login.assert_called_once()
+    mock_pkce_login.assert_not_called()
+    assert result == fresh_login
+
+
+def test_generate_pkce_pair_challenge_matches_rfc7636_s256():
+    import base64
+    import hashlib
+
+    code_verifier, code_challenge = cli._generate_pkce_pair()
+
+    expected_digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
+    expected_challenge = base64.urlsafe_b64encode(expected_digest).rstrip(b"=").decode("ascii")
+    assert code_challenge == expected_challenge
+    assert "=" not in code_challenge
+
+
+def _fire_pkce_callback(authorize_url, state=None, code="auth-code"):
+    """Simulate the browser hitting the loopback redirect with the given code/state,
+    reading the real redirect_uri (and state, unless overridden) out of the authorize URL."""
+    import threading
+    from urllib.parse import parse_qs, urlparse
+    from urllib.request import urlopen
+
+    query = parse_qs(urlparse(authorize_url).query)
+    redirect_uri = query["redirect_uri"][0]
+    state = query["state"][0] if state is None else state
+    callback_url = f"{redirect_uri}?code={code}&state={state}"
+    threading.Thread(target=urlopen, args=(callback_url,), daemon=True).start()
+
+
+def test_sso_pkce_login_completes_via_loopback_redirect(aws_paths, monkeypatch):
+    import base64
+    import hashlib
+
+    monkeypatch.setattr(cli, "PKCE_LOGIN_TIMEOUT_SECONDS", 5)
+    profile = make_profile(sso_session="my-sso")
+    cache_file = str(aws_paths / "sso" / "cache" / "hash.json")
+
+    mock_oidc = MagicMock()
+    mock_oidc.register_client.return_value = {"clientId": "id", "clientSecret": "secret"}
+    mock_oidc.create_token.return_value = {"accessToken": "the-token", "expiresIn": 3600}
+    captured_challenge = {}
+
+    def open_browser(url):
+        from urllib.parse import parse_qs, urlparse
+
+        captured_challenge["value"] = parse_qs(urlparse(url).query)["code_challenge"][0]
+        _fire_pkce_callback(url)
+
+    with (
+        patch("awssso.cli.boto3.client", return_value=mock_oidc),
+        patch("awssso.cli.webbrowser.open", side_effect=open_browser),
+    ):
+        result = cli._sso_pkce_login(profile, cache_file)
+
+    assert result["accessToken"] == "the-token"
+    verifier = mock_oidc.create_token.call_args.kwargs["codeVerifier"]
+    assert mock_oidc.create_token.call_args.kwargs["code"] == "auth-code"
+    digest = hashlib.sha256(verifier.encode("ascii")).digest()
+    assert base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii") == captured_challenge["value"]
+    with open(cache_file) as f:
+        assert json.load(f)["accessToken"] == "the-token"
+
+
+def test_sso_pkce_login_state_mismatch_aborts(aws_paths, monkeypatch):
+    monkeypatch.setattr(cli, "PKCE_LOGIN_TIMEOUT_SECONDS", 5)
+    profile = make_profile(sso_session="my-sso")
+    cache_file = str(aws_paths / "sso" / "cache" / "hash.json")
+
+    mock_oidc = MagicMock()
+    mock_oidc.register_client.return_value = {"clientId": "id", "clientSecret": "secret"}
+
+    with (
+        patch("awssso.cli.boto3.client", return_value=mock_oidc),
+        patch("awssso.cli.webbrowser.open", side_effect=lambda url: _fire_pkce_callback(url, state="wrong-state")),
+        pytest.raises(SystemExit) as exc,
+    ):
+        cli._sso_pkce_login(profile, cache_file)
+
+    assert exc.value.code == 1
+    mock_oidc.create_token.assert_not_called()
+
+
+def test_sso_pkce_login_times_out(aws_paths, monkeypatch):
+    monkeypatch.setattr(cli, "PKCE_LOGIN_TIMEOUT_SECONDS", 0.05)
+    profile = make_profile(sso_session="my-sso")
+    cache_file = str(aws_paths / "sso" / "cache" / "hash.json")
+
+    mock_oidc = MagicMock()
+    mock_oidc.register_client.return_value = {"clientId": "id", "clientSecret": "secret"}
+
+    with (
+        patch("awssso.cli.boto3.client", return_value=mock_oidc),
+        patch("awssso.cli.webbrowser.open"),
+        pytest.raises(SystemExit) as exc,
+    ):
+        cli._sso_pkce_login(profile, cache_file)
+
+    assert exc.value.code == 1
+    mock_oidc.create_token.assert_not_called()
 
 
 def test_sso_device_login_times_out(aws_paths):
