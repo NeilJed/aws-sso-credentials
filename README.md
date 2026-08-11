@@ -10,7 +10,7 @@ We switched to using [AWS SSO](https://aws.amazon.com/single-sign-on/) linked to
 This script is a quick work around to give us something functional that fits with our way of working until something better comes along. Maybe it works for you too.
 
 ## How it works
-This tool performs the SSO device-code login itself via Boto3, caches the resulting SSO credentials (in the same location the AWS CLI uses), then makes Boto3 calls to retrieve the temporary credentials for the relevant account/role you want.
+This tool performs the SSO login itself via Boto3, caches the resulting SSO credentials (in the same location the AWS CLI uses), then makes Boto3 calls to retrieve the temporary credentials for the relevant account/role you want. For `sso_session`-based profiles it logs in via PKCE (opens your browser, no code to type); legacy `sso_start_url`-based profiles use the device-code flow. Pass `--legacy` to force device-code login even for `sso_session` profiles.
 
 It uses the standard AWS CLI configuration files, can trigger a SSO login session if needed and gives you an interactive command line interface to switch between the role and account you want. It can also copy your chosen profile/credentials into the default profile for times where you don't want/can't tell your application to use a specific profile.
 
@@ -111,8 +111,10 @@ If you want to avoid having to set a profile, use the `-d` option detailed below
 
 - `-h, --help` - Show help and a list of command line options.
 - `-v, --verbose` Verbose mode. Tells you what the script is doing, dumps information about when your SSO credentials and temporary credentials expire, and shows the role/region alongside each profile in the picker.
-- `--login` Forces a fresh SSO login and refreshes SSO credentials, even if a valid cached login exists.
+- `--login` Forces a fresh SSO login and refreshes SSO credentials, even if a valid cached login exists. When several selected profiles share the same SSO session, only the first triggers a fresh login.
+- `--legacy` Forces device-code SSO login instead of PKCE for `sso_session` profiles.
 - `-d, --use-default` Copies the chosen profile and credentials to the default profile. This removes the need to pass a profile name or export the `AWS_PROFILE` environment variable. Ignored (with a warning) if more than one profile is given.
+- `-V, --version` Show the installed version and exit.
 
 ## Example
 

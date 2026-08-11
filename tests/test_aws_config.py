@@ -4,7 +4,7 @@ from configparser import ConfigParser
 
 import pytest
 
-from awssso.aws_config import resolve_profile_options
+from awssso.aws_config import profile_section, resolve_profile_options
 
 
 def make_config(sections):
@@ -14,6 +14,11 @@ def make_config(sections):
         for key, value in options.items():
             config.set(section, key, value)
     return config
+
+
+def test_profile_section():
+    assert profile_section("dev") == "profile dev"
+    assert profile_section("default") == "default"
 
 
 def test_legacy_profile_returned_unchanged():
